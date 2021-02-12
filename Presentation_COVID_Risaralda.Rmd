@@ -1,0 +1,375 @@
+---
+title: "Riesgo de muerte por COVID-19 en Risaralda"
+author: "Jose Martinez, Juan Camilo Martínez, Diego Alejandro Rincon, Manuel Andrés Martínez, Jorge Andrés Sánchez, Cesar David Salinas Lopez,  Maria del Pilar Gomez Ceballos, Marla Ruiz Bohorquez, Sandra Gomez, Deicy Yohana Aguirre Gonzalez, Ligelly Hernandez Mayorga, Juan Daniel Castrillon, Oscar Felipe Suarez Brochero."
+date: "2/10/2021"
+output:
+  ioslides_presentation:
+    incremental: true
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = F, warning = F, message = F, error = F)
+library(rmdformats)
+library(bookdown)
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(e1071)
+library(png)
+library(tidyverse)
+library(purrr)
+library(cluster)
+library(knitcitations)
+library(knitLatex)
+library(corrplot)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(gganimate)
+library(ggrepel)
+library(GGally)
+library(ggdendro)
+library(reshape2)
+library(cowplot)
+library(grid)
+library(anytime)
+library(lubridate)
+library(tibble)
+library(kableExtra)
+library(data.table)
+library(htmlwidgets)
+library(htmltools)
+library(caret)
+library(ISLR)
+library(class)
+library(plotly)
+library(RColorBrewer)
+library(ggsci)
+library(gridExtra)
+library(papeR)
+library(mlbench)
+library(epiDisplay)
+library(Amelia)
+library(readr)
+library(hrbrthemes)
+library(leaps)
+library(scales)
+library(gapminder)
+library(tree)
+library(lars)
+library(dygraphs)
+library(xts)          # To make the convertion data-frame / xts format
+```
+
+## Antecedentes
+
+- El 15 de marzo, llegó el primer caso de COVID 19 importado de los Estados Unidos. Previo a este evento, se organizó la Sala de Análisis de Riesgo para establecer todas las intervenciones necesarias para contener y mitigar la pandemia.
+
+- Se conformaron equipos de trabajo a nivel de la Secretaría de Salud y equipos de rastreadores en los municipios con una muy activa participación de las direcciones locales de salud y coordinación con las EAPB. Se programaron reuniones con regularidad y una expedita comunicación con tomadores de decisiones.
+
+
+## Antecedentes
+
+Adicionalmente la gobernación de Risaralda con fondos de regalías y recursos propios organizó la red para la identificación de casos sospechosos, toma de muestras y diagnóstico por RT PCR con el apoyo de la Universidad Tecnológica de Pereira. Se realizaron capacitaciones con todos los actores para el manejo de los pacientes COVID, la búsqueda de contactos estrechos y el reporte de los mismos para el monitoreo y toma de muestras.
+
+
+## Antecedentes
+
+- También se organizó un comité de comunicación y medios para la divulgación de información y el estimulo de medidas no farmacológicas para controlar la diseminación del Sars Cov 2.
+
+- Con recursos de regalías y propios. La Gobernación creo un equipo de rastreados y equipos de respuesta inmediata para apoyar las iniciativas que los municipios llevaron a cabo con la misma orientación. Estos equipos actuaron sin ninguna interrupción en el fin de año y comienzo del año nuevo. Los equipos de la gobernación actuaron bajo la coordinación del técnico de saneamiento ambiental y la dirección local de salud además de contar con el apoyo de la ESE de cada localidad.
+
+
+## Antecedentes
+
+- Otros equipos que se desarrollaron fueron equipos de trabajo con participación de la comunidad que lograron de una manera muy exitosa el control de la pandemia en época de cosecha que movilizo 25000 jornaleros agrícola de café fuera del departamento y 20000 del departamento con gran movilidad al interior de la región. Esta labor se logró con una gran participación de los Comités de Cafetero no solo departamental si no municipal.
+
+
+- También los gremios dotaron zonas de expansión para áreas no COVID visualizando un colapso de los servicios de salud por COVID-19.
+
+
+
+## Datos
+
+Los ingenieros realizaron el almacenamiento de bases de datos que luego a solicitud de las necesidades epidemiológicas eran cruzadas para poder integrar los diferentes sistemas que se generaron como vincular la información SIVIGILA, SISMUESTRAS y las condiciones de egreso de los sujetos con relación al egreso de la pandemia que denominamos tablero.
+
+
+## Datos 
+
+```{r data1, echo = F}
+
+Covid_dt = read_csv("Covid20202021.csv")
+
+attach(Covid_dt)
+
+Covid_dt = Covid_dt[ , -c(3,4,5,6,7,9,28,30,33,66,68,69,70,71,76)]
+
+Fec_not = lubridate::mdy(fec_not)
+Covid_dt$fec_not = Fec_not
+
+Fec_con = lubridate::mdy(fec_con)
+Covid_dt$fec_con = Fec_con
+
+Ini_sin = lubridate::mdy(ini_sin)
+Covid_dt$ini_sin = Ini_sin
+
+Fecha_Resultado = lubridate::mdy(FechaResultado)
+Covid_dt$FechaResultado = Fecha_Resultado
+
+Fec_hos = lubridate::mdy(fec_hos)
+Covid_dt$fec_hos = Fec_hos
+
+Fec_def = lubridate::mdy(fec_def)
+Covid_dt$fec_def = Fec_def
+
+Covid_dt$Defuncion = factor(Defuncion)
+Covid_dt$cod_ase = factor(cod_ase)
+Covid_dt$estrato = factor(estrato)
+Covid_dt$Ciudad = factor(Ciudad)
+Covid_dt$Sexo2 = factor(Sexo2)
+Covid_dt$RangoEdad = factor(RangoEdad,
+                            levels = c("0 a 9", "10 a 19", "20 a 29", "30 a 39",
+                                       "40 a 49", "50 a 59", "60 a 69", "70 a 79",
+                                       "80 a 89", "90 a 99"),
+                            labels = c("0 a 9", "10 a 19", "20 a 29", "30 a 39",
+                                       "40 a 49", "50 a 59", "60 a 69", "70 a 79",
+                                       "80 a 89", "90 a 99"))
+names(Covid_dt)[61] = c('Epidem_Week')
+
+kbl(head(Covid_dt, 15), booktabs = T, caption = "Tabla 1. Encabezado de la base de datos.") %>%
+  kable_styling('hover', full_width = F, font_size = 15) %>%
+  scroll_box(height = '470px', width = '95%')
+
+```
+
+
+
+## Metodología
+
+Se consideraron diferentes modelos predictivos para modelar para el desenlace de los pacientes (*i. g.,* **Fatal** o **No Fatal**):
+
+\[
+\underbrace{y}_{Desenlace} \approx f(\underbrace{X_{1}, \: X_{2}, \: \dots, \: X_{n}}_{Variables \: Base \: de \: datos.})
+\]
+
+- Open source softwares:
+  * Rstudio: Análisis exploratorio de datos.
+  * Python: Machine Learning y Computación paralela (Google Cloud Platform)
+- Principios de Replicabilidad y Reproducibilidad:
+  * Código disponible en GitHub.
+
+
+## Análisis exploratorio de datos
+
+> *Dejar que los datos hablen por si mismos ...*
+
+
+## Casos totales en el tiempo
+
+
+```{r fig.cap = 'Figura 1. Casos totales durante el tiempo de registro.'}
+don = Covid_dt %>%
+  group_by(fec_not) %>%
+  tally()
+
+Don = xts(
+  x = don$n, order.by = don$fec_not
+)
+
+dygraph(Don) %>%
+  dyOptions(labelsUTC = TRUE, fillGraph=TRUE, fillAlpha=0.1, drawGrid = FALSE, colors="#D8AE5A") %>%
+  dyRangeSelector() %>%
+  dyCrosshair(direction = "vertical") %>%
+  dyHighlight(highlightCircleSize = 5, highlightSeriesBackgroundAlpha = 0.2, hideOnMouseOut = FALSE)  %>%
+  dyRoller(rollPeriod = 1)
+
+```
+
+
+## Casos totales agrupados según el sexo
+
+
+```{r fig.cap='Figure 2. Casos totales agrupados segun el sexo.'}
+
+Cases_per_date = Covid_dt %>%
+  mutate(Sex = ifelse((Sexo2 == 1) == T, 'Masculino', 'Femenino')) %>%
+  group_by(fec_not, Sex) %>%
+  tally()
+  
+fig1 = Cases_per_date %>%
+  ggplot(aes(x = fec_not, y = n, group = Sex)) +
+  geom_point(aes(colour = Sex), alpha = 0.5) +
+  ylab('Casos totales') + xlab('') +
+  ggtitle('Casos por fecha') +
+  theme(legend.position = 'bottom')
+
+
+ggplotly(fig1, tooltip = c('n'))
+
+
+```
+
+
+## Casos totales agrupados por municipio
+
+```{r out.width = "700px", out.height= "500px", fig.cap = 'Figura 3. Casos totales por municipio en función del tiempo.'}
+Cases_by_Municipality = Covid_dt %>%
+  mutate(Sex = ifelse((Sexo2 == 1) == T, 'Masculino', 'Femenino'),
+         Municipality = factor(Ciudad)) %>%
+  filter(Municipality %in% c('Pereira', 'Dosquebradas', 'Santa Rosa')) %>%
+  group_by(Municipality, Sex, fec_not) %>%
+  tally()
+  
+ 
+# Make a ggplot, but add frame=year: one image per year
+ggplot(Cases_by_Municipality,
+       aes(x = fec_not, y = n, group = Municipality)) +
+  geom_point(aes(colour = Municipality), alpha = 0.5) +
+  geom_line(aes(colour = Municipality), alpha = 0.5) +
+  labs(title = 'Número de casos positivos en el tiempo',
+       x = '', y = 'Número de casos') +
+  transition_reveal(fec_not) +
+  theme(legend.position = 'bottom')
+
+# Save at gif:
+anim_save("271-ggplot2-animated-gif-chart-with-gganimate1.gif")
+```
+
+
+## Casos totales según EPS
+
+```{r fig.height=8}
+
+Tabla2 = Covid_dt %>%
+  filter(Ciudad %in% c('Pereira', 'Dosquebradas', 'Santa Rosa')) %>%
+  mutate(Sexo = ifelse((Sexo2 == 1) == T, 'Masculino', 'Femenino'),
+         Desenlace = ifelse((Defuncion == 1) == T, 'Fallecido', 'Vivo')) %>%
+  group_by(Ciudad, cod_ase, Sexo, Desenlace) %>%
+  tally() 
+
+EPS_dt = Tabla2[order(Tabla2$n, decreasing = T),]
+  
+colnames(EPS_dt) = c('Municipio', 'Código EPS', 'Sexo', 'Desenlace', 'Totales')
+
+kbl(head(EPS_dt, 30), booktabs = T, caption = 'Tabla 2. Desenlace según EPS') %>%
+  kable_styling('hover', full_width = F) %>%
+  scroll_box(height = '350px', width = '95%')
+  
+```
+
+## Casos totales según edad
+
+
+```{r fig.cap = 'Figura 4. Distribución de la edad en los pacientes que sobreviven y fallecen.'}
+Tabla3 = Covid_dt %>%
+  filter(Ciudad %in% c('Pereira', 'Dosquebradas', 'Santa Rosa', 'La Virginia')) %>%
+  mutate(Desenlace = ifelse((Defuncion == 1) == T, 'Fallecido', 'Vivo')) %>%
+  group_by(Ciudad, Edad, Desenlace) %>%
+  tally() 
+
+
+Tabla3 %>%
+  group_by(Ciudad) %>%
+  ggplot(aes(x = Desenlace, y = Edad, group = Desenlace)) +
+  geom_boxplot(aes(fill = Desenlace), alpha = 0.5) +
+  facet_wrap(~Ciudad)
+
+
+```
+
+## Modelos predictivos
+
+- Metodos Clasicos:
+  * Regresion Logistica
+  
+- Machine Learning (Supervised):
+  * Regresion Logistica.
+  * Clasificacion por arboles:
+    + Arboles de decision.
+    + Random Forest.
+  * Redes Neuronales.
+  * Vecinos Cercanos:
+    + Numero de Vecinos *k*.
+    + Centroides.
+  
+  
+## Regresion Logistica Clasica
+
+```{r fig.cap = 'Figura 5. Variacion de los valores de los coefficientes segun cambios en los datos considerados.'}
+
+betas = read_csv('betas.csv')
+
+rownames(betas) <- c('edad', 'cod_ase', 'gp_carcela', 'gp_indigen',
+                     'gp_mad_com', 'tos', 'fiebre', 'odinofagia',
+                     'dif_res', 'adinamia', 'rinorrea', 'conjuntivi',
+                     'cefalea', 'diarrea', 'perd_gusto', 'otros_sint',
+                     'asma', 'epoc', 'diabetes', 'vih', 'enf_car',
+                     'cancer', 'desnutricion', 'obesidad', 'ins_renal',
+                     'fumador', 'hipertension', 'tuberculos', 'Ciudad',
+                     'Sexo')
+
+Betas = t(betas)
+#head(Betas)
+
+Betas_melt = melt(Betas)
+#head(Betas_melt)
+
+betas1 = Betas_melt %>%
+  group_by(Var2) %>%
+  ggplot(aes(x = Var2, y = value, group = Var2)) +
+  geom_boxplot(aes(colour = Var2, fill = Var2), alpha = 0.5) +
+  xlab('') + ylab('Valor del Coeficiente') + 
+  ylim(-0.06, 0.06) +
+  theme(legend.position = 'none', axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
+
+
+ggplotly(betas1)
+  
+```
+
+
+
+
+## Vecinos Mas Cercanos
+
+```{r fig.cap='Figura 6. Resultado de la validacion cruzada para definir el mejor valor para el paramtero.'}
+
+NN_centroid_CV = read_csv('NN_centroid_CV.csv')
+
+NN_centroid_CV %>%
+  ggplot(aes(x = shrinkages, y = especificidad)) +
+  geom_point(aes(colour = 'Especificidad')) +
+  geom_line(aes(colour = 'Especificidad'), linetype = 'dashed') +
+  geom_point(aes(x = shrinkages, y = sensibilidad, colour = 'Sensibilidad')) +
+  geom_line(aes(x = shrinkages, y = sensibilidad, colour = 'Sensibilidad'), linetype = 'dashed') +
+  ylab('Porcentaje [%]') + xlab('Shrinkage') +
+  geom_ribbon(aes(xmin = 25, xmax = 40), color = 'darkgreen', fill = 'darkgreen', alpha = 0.5) +
+  scale_colour_manual(name = 'Leyenda:',
+                      values = c('Especificidad'= 'red',
+                                 'Sensibilidad'= 'blue')) +
+  theme(legend.position = 'bottom')
+
+```
+
+## Vecinos Mas Cercanos
+
+```{r include=T, out.width = "700px", out.height= "500px", fig.cap='Figura 7. Matriz de confusion segun mejor modelo.'}
+#![Mejor modelo predictivo](conf_mat_NN_centroid.png)
+
+library(png)
+library(knitr)
+
+img1_path <- "conf_mat_NN_centroid.png"
+img1 <- readPNG(img1_path, native = TRUE, info = TRUE)
+include_graphics( "conf_mat_NN_centroid.png")
+
+#library(imager)
+#myimg <- load.image("conf_mat_NN_centroid.png")
+#print(myimg)
+
+```
+
+## Conclusiones
+
+
+## Referencias

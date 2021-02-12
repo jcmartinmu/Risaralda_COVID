@@ -1,0 +1,596 @@
+---
+title: "Logistic Regression Modeling"
+author: "Jose W. Martinez, Manuel A. Martinez, Jorge, Juan Martinez"
+date: "1/31/2021"
+output:
+  html_document:
+    github_document: true
+    toc: true
+    toc_float: true
+    number_sections: false
+    toc_depth: 5.0
+    code_folding: hide
+    code_download: true
+    highlight: tango
+    md_extensions: -autolink_bare_uris+hard_line_breaks
+    includes:
+    after_body: appendix.md
+    linkcolor: cyan
+bibliography: Epidemiology_COVID_19.bib
+run_time: shiny
+citecolor: blue
+urlcolor: red
+links-as-notes: true
+biblio-title: References
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, error = F)
+library(rmdformats)
+library(bookdown)
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(e1071)
+library(png)
+library(tidyverse)
+library(purrr)
+library(cluster)
+library(knitcitations)
+library(knitLatex)
+library(corrplot)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(gganimate)
+library(ggrepel)
+library(GGally)
+library(ggdendro)
+library(reshape2)
+library(cowplot)
+library(grid)
+library(anytime)
+library(lubridate)
+library(tibble)
+library(kableExtra)
+library(data.table)
+library(htmlwidgets)
+library(htmltools)
+library(caret)
+library(ISLR)
+library(class)
+library(plotly)
+library(RColorBrewer)
+library(ggsci)
+library(gridExtra)
+library(papeR)
+library(mlbench)
+library(epiDisplay)
+library(Amelia)
+library(readr)
+library(hrbrthemes)
+library(leaps)
+library(scales)
+library(gapminder)
+library(tree)
+library(lars)
+library(dygraphs)
+library(xts)          # To make the convertion data-frame / xts format
+```
+
+# Introduction
+
+The novel coronavirus Sars-Cov2 (COVID-19) ... (Aqui siguen los médicos ...)
+
+- Variable transformation:
+
+```{r datainput, echo = T}
+
+Covid_dt = read_csv("Covid20202021.csv")
+
+attach(Covid_dt)
+
+Covid_dt = Covid_dt[ , -c(3,4,5,6,7,9,28,30,33,66,68,69,70,71,76)]
+
+Fec_not = lubridate::mdy(fec_not)
+Covid_dt$fec_not = Fec_not
+
+Fec_con = lubridate::mdy(fec_con)
+Covid_dt$fec_con = Fec_con
+
+Ini_sin = lubridate::mdy(ini_sin)
+Covid_dt$ini_sin = Ini_sin
+
+Fecha_Resultado = lubridate::mdy(FechaResultado)
+Covid_dt$FechaResultado = Fecha_Resultado
+
+Fec_hos = lubridate::mdy(fec_hos)
+Covid_dt$fec_hos = Fec_hos
+
+Fec_def = lubridate::mdy(fec_def)
+Covid_dt$fec_def = Fec_def
+
+Covid_dt$Defuncion = factor(Defuncion)
+Covid_dt$cod_ase = factor(cod_ase)
+Covid_dt$estrato = factor(estrato)
+Covid_dt$Ciudad = factor(Ciudad)
+Covid_dt$Sexo2 = factor(Sexo2)
+Covid_dt$RangoEdad = factor(RangoEdad,
+                            levels = c("0 a 9", "10 a 19", "20 a 29", "30 a 39",
+                                       "40 a 49", "50 a 59", "60 a 69", "70 a 79",
+                                       "80 a 89", "90 a 99"),
+                            labels = c("0 a 9", "10 a 19", "20 a 29", "30 a 39",
+                                       "40 a 49", "50 a 59", "60 a 69", "70 a 79",
+                                       "80 a 89", "90 a 99"))
+names(Covid_dt)[61] = c('Epidem_Week')
+
+
+
+```
+
+- Overview of the dataset:
+
+```{r vartrans, echo = T, error = T, message=F, warning=F}
+
+
+kbl(head(Covid_dt), booktabs = T,
+    caption = 'Table 1. Overview of the dataset.') %>%
+  kable_styling('hover', full_width = F) %>%
+  scroll_box(height = '300px', width = '95%')
+```
+
+## Descriptive Analysis
+
+### Total Number of Cases Over Time
+
+```{r echo = T, error =F, message = F, warning=F}
+
+don = Covid_dt %>%
+  group_by(fec_not) %>%
+  tally()
+
+Don = xts(
+  x = don$n, order.by = don$fec_not
+)
+
+dygraph(Don) %>%
+  dyOptions(labelsUTC = TRUE, fillGraph=TRUE, fillAlpha=0.1, drawGrid = FALSE, colors="#D8AE5A") %>%
+  dyRangeSelector() %>%
+  dyCrosshair(direction = "vertical") %>%
+  dyHighlight(highlightCircleSize = 5, highlightSeriesBackgroundAlpha = 0.2, hideOnMouseOut = FALSE)  %>%
+  dyRoller(rollPeriod = 1)
+
+
+```
+
+
+### Number of Cases Over Time grouped by Sex
+
+```{r echo = T, fig.height = 6, fig.width= 7, fig.cap='Figure 1. Total number of cases over time.'}
+
+Cases_per_date = Covid_dt %>%
+  mutate(Sex = ifelse((Sexo2 == 1) == T, 'Male', 'Female')) %>%
+  group_by(fec_not, Sex) %>%
+  tally()
+  
+fig1 = Cases_per_date %>%
+  ggplot(aes(x = fec_not, y = n, group = Sex)) +
+  geom_point(aes(colour = Sex), alpha = 0.5) +
+  ylab('Total Number of Cases') + xlab('') +
+  ggtitle('Cases per date') +
+  theme(legend.position = 'bottom')
+
+
+ggplotly(fig1, tooltip = c('n'))
+
+
+```
+
+
+```{r echo = T, fig.height = 6, fig.width= 7, fig.cap='Figure 2. Total number of cases grouped by Municipality.'}
+
+Cases_by_Municipality = Covid_dt %>%
+  mutate(Sex = ifelse((Sexo2 == 1) == T, 'Male', 'Female'),
+         Municipality = factor(Ciudad)) %>%
+  filter(Municipality %in% c('Pereira', 'Dosquebradas', 'Santa Rosa')) %>%
+  group_by(Municipality, Sex, fec_not) %>%
+  tally()
+  
+ 
+# Make a ggplot, but add frame=year: one image per year
+ggplot(Cases_by_Municipality,
+       aes(x = fec_not, y = n, group = Municipality)) +
+  geom_point(aes(colour = Municipality), alpha = 0.5) +
+  geom_line(aes(colour = Municipality), alpha = 0.5) +
+  labs(title = 'Temporal Evolution of the Number of Positive Cases',
+       x = '', y = 'Number of Cases') +
+  transition_reveal(fec_not)
+
+# Save at gif:
+anim_save("271-ggplot2-animated-gif-chart-with-gganimate1.gif")
+```
+
+```{r echo = T, fig.height = 6, fig.width= 7, fig.cap='Figure 3. Total number of cases over time.'}
+
+
+ggplot(Cases_per_date, aes(x = fec_not, y = n, group = Sex)) +
+  geom_point(aes(colour = Sex), alpha = 0.5) +
+  geom_line(aes(colour = Sex), alpha = 0.5) +
+#  scale_color_viridis(discrete = TRUE) +
+  labs(title = 'Temporal Evolution of the Number of Positive Cases',
+        x = '', y = 'Number of Cases') +
+#  theme_ipsum() +
+  ylab("Number of babies born") +
+  transition_reveal(fec_not)
+
+
+
+# Save at gif:
+anim_save("287-smooth-animation-with-tweenr.gif")
+```
+
+
+
+### Number of Cases Over Time grouped by Municipality
+
+```{r echo = T, fig.height = 15, fig.width= 7, fig.cap='Figure 4. Number of cases per date grouped by municipality.'}
+
+Covid_dt %>%
+  mutate(Sex = ifelse((Sexo2 == 1) == T, 'Male', 'Female'),
+         Municipality = Ciudad) %>%
+  group_by(Municipality, fec_not, Sex) %>%
+  tally() %>%
+  ggplot(aes(x = fec_not, y = n, group = Sex)) +
+  geom_point(aes(colour = Sex), alpha = 0.25) +
+  ylab('Number of Cases') + xlab('') +
+  facet_wrap(~Municipality, ncol = 2) +
+  ggtitle('Cases per date') +
+  theme(legend.position = 'bottom')
+
+
+```
+
+### Total Number of Cases grouped by Age Group
+
+
+```{r echo = T, fig.height = 9, fig.width= 6, fig.cap='Figure 5. Number of cases per date grouped by municipality.'}
+
+Covid_dt %>%
+  filter(Ciudad %in% c('Pereira', 'Dosquebradas', 'Santa Rosa', 'La Virginia')) %>%
+  mutate(Group = RangoEdad,
+         Municipality = Ciudad) %>%
+  group_by(Municipality, fec_not, Group) %>%
+  tally() %>%
+  ggplot(aes(x = fec_not, y = n, group = Group)) +
+  geom_line(aes(colour = Group), alpha = 0.25) +
+  ylab('Number of Cases') + xlab('') +
+  facet_wrap(~Municipality, nrow = 4) +
+  ggtitle('Cases per date') +
+  theme(legend.position = 'bottom')
+
+
+```
+
+### Total Number of Cases grouped by Age Group and Sex
+
+
+```{r fig.height= 5, fig.width=5, message = F, warning = F, error = F, fig.cap = 'Figure 6. 3D representation of  the number of positive cases over time.'}
+
+Cases_per_Group_Sex = Covid_dt %>%
+  mutate(Group = RangoEdad,
+         Sex = ifelse((Sexo2 == 1) == T, 'Male', 'Female')) %>%
+  group_by(Group, Sex, fec_not) %>%
+  tally()
+
+axx <- list(
+  title = "Sex"
+)
+
+axy <- list(
+  title = "Date"
+)
+
+axz <- list(
+  title = "Number of Cases"
+)
+
+Num_Cases = Cases_per_Group_Sex$n
+Sex = Cases_per_Group_Sex$Sex
+Date = Cases_per_Group_Sex$fec_not
+
+plot_ly(z = ~Num_Cases, x = ~Sex, y = ~Date,
+        size = I(4)) %>%
+  layout(scene = list(xaxis=axx,yaxis=axy,zaxis=axz)) 
+
+```
+
+
+### Total Number of Cases by EPS
+
+
+```{r echo = T, fig.height = 11,fig.width= 5, fig.cap='Figure 7. Number of cases per healthcare provider (EPS).'}
+
+Covid_dt %>%
+  mutate(Sex = ifelse((Sexo2 == 1) == T, 'Male', 'Female'),
+         Municipality = Ciudad) %>%
+  group_by(Municipality, cod_ase, Sex) %>%
+  tally() %>%
+  ggplot(aes(y = cod_ase, group = Sex)) +
+  geom_bar(aes(colour = Sex, fill = Sex), alpha = 0.25) +
+  ylab('EPS') + xlab('Number of Cases') +
+  ggtitle('Number of Cases by EPS') +
+  theme(legend.position = 'bottom')
+
+
+```
+
+
+
+```{r fig.height= 17, fig.width=7}
+
+fig_eps = Covid_dt %>%
+  filter(Ciudad == 'Pereira') %>%
+  mutate(Municipality = Ciudad,
+         EPS = factor(cod_ase)) %>%
+  group_by(Municipality, fec_not, EPS) %>%
+  tally() %>%
+  ggplot(aes(x = fec_not, y = n, group = EPS)) +
+  geom_line(aes(colour = EPS), alpha = 0.35, linetype = 'dashed') +
+  ylab('Number of Cases') + xlab('') +
+  ggtitle('Number of Cases over time grouped by EPS') +
+  theme(legend.position = 'none')
+
+ggplotly(fig_eps, tooltip = c('n', 'EPS'))
+```
+
+
+
+# Methodology
+
+We used 80% of the dataset for training, and 20% for testing. Also, we applied a 10-fold cross-validation to train and select the models. Since there were an important number of `NA`s, we removed the following variables:
+
+* `estrato`
+* `con_fin`
+* `trab_salud`
+* `deter_clin`
+* `fec_hos`
+* `fec_def`
+* `Epidem_Week`
+* `otros_dc`
+* `TPRUEBA`
+* `Edad`
+ 
+
+The following chunk describes how the dataset was subdivided into two `dataframes`using a random subdividision of the data considering the response variable (`Defuncion`) as reference:
+
+* `Covid_dt_train`
+* `Covid_dt_train`
+
+```{r echo =T}
+
+#Code_Ase = ifelse(is.na(cod_ase) == T, 888888, cod_ase)
+
+#Covid_dt$cod_ase = Code_Ase
+
+#set.seed(1234)
+#train <- createDataPartition(Covid_dt$Defuncion, p = 0.8, list = F, times = 1)
+
+Covid_dt_train = Covid_dt[train, -c(1,2,5,18,19,20,21,22,23,24,25,49,55,56,58,59,60,61,62,63,65,67,68)]
+
+
+write.csv(Covid_dt_train, 'Covid_dt_train.csv', sep = ',', row.names = F)
+Covid_dt_test = Covid_dt[-train,-c(1,2,5,18,19,20,21,22,23,24,25,49,55,56,58,59,60,61,62,63,65,67,68)]
+
+write.csv(Covid_dt_test, 'Covid_dt_test.csv', sep = ',', row.names = F)
+
+head(Covid_dt_train)
+
+```
+
+## Validation Set Approach
+
+```{r}
+
+logistic.train.model <- glm(Defuncion ~ .,
+                            family = binomial,
+                            data = df)
+
+model_train_set = summary(logistic.train.model)
+Coef_assessment_train_set = prettify(summary(logistic.train.model))
+        
+train_set_probs = predict(logistic.train.model, Covid_dt_test, type = "response")
+train_set_class = ifelse(train_set_probs > 0.5, 1, 0)
+test_error_train_set = round(100*mean(train_set_class != Covid_dt_test$Defuncion), 2)
+
+conf_mat_train_set = table(train_set_class[[i]], Covid_dt_test$Defuncion)
+```
+
+
+
+## Parameter Tuning
+
+The `fitControl()` function performs a 10-fold cross-validation:
+
+```{r echo = T}
+#------------------------------------------------------------------------------
+# GLM Cross Validation: 
+
+K = 10
+
+set.seed(1234)
+rand_ind <- groupKFold(c(1:dim(Covid_dt_train)[1]), k = K)
+
+sm <- list()
+model_summary <- list()
+model <- list()
+conf_mat <- list()
+Coef_assessment <- list()
+
+k_fold_probs <- list()
+k_fold_class <- list()
+test_error = 0
+  
+for(i in 1:K){
+  
+  df = Covid_dt_train[rand_ind[[i]],]
+  df_test = Covid_dt_train[-rand_ind[[i]],]
+  
+  logistic.fit = glm(Defuncion ~ .,
+                      family = binomial,
+                      data = df)
+        
+  model[[i]] = logistic.fit
+  model_summary[[i]] = summary(logistic.fit)
+  Coef_assessment[[i]] = prettify(summary(logistic.fit))
+        
+  k_fold_probs[[i]] = predict(logistic.fit, df_test, type = "response")
+  test_error[i] = round(100*mean(k_fold_probs != df_test$Defuncion), 2)
+        
+  #k_fold_class[[i]] = ifelse(k_fold_probs > 0.5, 1, 0)
+        
+  conf_mat[[i]] = table(k_fold_class[[i]], df_test$Defuncion)
+}
+      
+      CV_summary = data.frame(cbind(
+        'Fold' = (1:kc),
+        'Test Error' = test_error))
+      
+#      low_error = which(min(test_error) == T, arr.ind = T)
+      
+#      Lowest_test_error = test_error[low_error]
+      
+#      Model = model[[low_error]]
+#      Model_Summary = model_summary[[low_error]]
+#      k_fold_Classification = k_fold_class[[low_error]]
+#      Confusion_Matrix = conf_mat[[low_error]]
+      
+      performance <- list("Model" = model,
+                          "k-fold CV summary"  = CV_summary,
+                          "Model Summary" = model_summary,
+                          "Coefficients" =  Coef_assessment,
+                          "Predicted outcome" = k_fold_probs,
+                          "Confusion Matrix" = conf_mat)
+      
+      return(performance)
+}
+
+
+
+Logistic_Model = k_fold_cv_logistic(K, Covid_dt_train, Covid_dt_test)
+
+```
+
+
+## Logistic Regression Model
+
+Logistic regression are models are often considered for this type of situations (*we neeed to add references here!*), and thus we consider this model as a reference to assess the accuracy of the other models.
+
+### Full Model
+
+(*We still can add more regressors*)
+
+#### Training
+
+The function `train()` trains the model using the pre-specified data partition:
+
+```{r echo = T}
+# 'LogitBoost'
+
+set.seed(12345)
+full_model_logistic <- train(Defuncion ~ semana + edad + gp_discapa + gp_gestan +
+                             Riesgos + tos + fiebre + odinofagia + dif_res + adinamia +
+                             rinorrea + conjuntivi + cefalea + diarrea + perd_gusto +
+                             asma + epoc + Comorbilidades + Sexo2,
+                             data = Covid_dt_train,
+                             method = "Logit", 
+                             trControl = fitControl)
+
+full_model_logistic
+
+
+ggplot(full_model_logistic)
+
+whichTwoPct <- tolerance(full_model_logistic$results, metric = "Accuracy", 
+                         tol = 2, maximize = TRUE)  
+#cat("best model within 2 pct of best:\n")
+
+full_model_logistic$results[whichTwoPct,]
+
+full_model_logistic_pred = predict(full_model_logistic, newdata = Covid_dt_test)
+
+Conf_Mat_full_model_logistic = table(full_model_logistic_pred, Covid_dt_test$Defuncion)
+Conf_Mat_full_model_logistic
+#sensit_full_model_Logistic <- Conf_Mat_full_model_logistic[2,2]/(Conf_Mat_full_model_logistic[1, 2] + Conf_Mat_full_model_logistic[2, 2])
+
+#sensit_full_model_Logistic = round(100*sensit_full_model_Logistic, 2)
+
+#ROC_test_full_model_logistic <- data.frame(matrix(vector(),
+#                                            nrow = dim(Covid_dt_test)[1],
+#                                            ncol = 4,
+#                                            dimnames = list(c(),
+#                                                            c("obs",
+#                                                              "pred",
+#                                                              "Yes",
+#                                                              "No"))),
+#                                           stringsAsFactors = T)
+
+#levels(Covid_dt_test$Defuncion) <- c("Survived", "Death")
+#Failure_Pred_MMR_Liberal <- factor(Failure_Pred_MMR_Liberal)
+#levels(full_model_logistic_pred) <- c("Survived", "Death")
+
+#ROC_test_full_model_logistic$obs <- Covid_dt_test$Defuncion
+#ROC_test_full_model_logistic$pred <- full_model_logistic_pred
+#ROC_test_full_model_logistic$Yes <- rep(length(Covid_dt_test$Defuncion[Covid_dt_test$Defuncion == "Death"])/length(Covid_dt_test$Defuncion))
+#ROC_test_full_model_logistic$No <- 1 - ROC_test_full_model_logistic$Yes
+
+#twoClassSummary(ROC_test_full_model_logistic,
+#                lev = levels(ROC_test_full_model_logistic$obs))
+```
+According to this output, the model has a high accuracy to predict the `Survival` of the patients, but a low accuracy to predict `Death` of a patient.
+
+## Implicit Feature Selection
+
+```{r echo = T, eval=FALSE}
+set.seed(12345)
+full_model_AdaBoost <- train(Defuncion ~ semana + edad + gp_discapa + gp_gestan +
+                             Riesgos + tos + fiebre + odinofagia + dif_res + adinamia +
+                             rinorrea + conjuntivi + cefalea + diarrea + perd_gusto +
+                             asma + epoc + Comorbilidades + Sexo2,
+                             data = Covid_dt_train,
+                             method = "adaboost", 
+                             trControl = fitControl)
+```
+
+
+
+
+## Random Forest
+
+
+## ROC Curves
+
+## Neural Networks
+
+### Multi-Layer Perceptron
+
+```{r echo = T, eval = T}
+set.seed(12345)
+full_model_MLP <- train(Defuncion ~ semana + edad + gp_discapa + gp_gestan +
+                          Riesgos + tos + fiebre + odinofagia + dif_res + adinamia +
+                          rinorrea + conjuntivi + cefalea + diarrea + perd_gusto +
+                          asma + epoc + Comorbilidades + Sexo2,
+                        data = Covid_dt_train,
+                        method = "mlp", 
+                        trControl = fitControl)
+
+full_model_MLP_pred = predict(full_model_MLP, newdata = Covid_dt_test)
+
+Conf_Mat_full_model_MLP = table(full_model_MLP_pred, Covid_dt_test$Defuncion)
+Conf_Mat_full_model_MLP
+```
+
+
+# References {-}
+
+<div id="refs"></div>
