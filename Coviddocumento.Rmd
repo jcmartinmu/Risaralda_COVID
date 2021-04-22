@@ -1,0 +1,115 @@
+---
+title: "Covid 19"
+author: "Jose W Martinez, Juan Camilo Martínez"
+date: "21/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F, error = F)
+#library(rmdformats)
+#library(bookdown)
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(e1071)
+#library(png)
+library(tidyverse)
+library(purrr)
+library(cluster)
+#library(knitcitations)
+#library(knitLatex)
+#library(corrplot)
+#library(stringr)
+library(dplyr)
+library(ggplot2)
+#library(gganimate)
+#library(ggrepel)
+#library(GGally)
+#library(ggdendro)
+#library(reshape2)
+library(cowplot)
+library(grid)
+#library(anytime)
+library(lubridate)
+library(tibble)
+library(kableExtra)
+#library(data.table)
+#library(htmlwidgets)
+#library(htmltools)
+#library(caret)
+#library(ISLR)
+#library(class)
+library(plotly)
+library(readr)
+```
+
+## Introducción
+
+Estos datos se obtienen del sistema de vigilancia epidemiológica que la Secretaria de Salud de Risaralda tiene dispuesto para el monitoreo de la pandemia por COVID 19:
+
+-   Año
+-   Semana
+-   UCI
+-   Hospitalizado
+-   Defunción
+
+Presentaramos el comportamiento de la **edad** de por cada *semana*
+
+```{r data1, echo = F}
+casoscovid2021<-read_delim("Data/COVI20212.csv", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
+
+colnames(casoscovid2021)[21]<-"Defuncion" 
+casoscovid2021$Semana <- factor(casoscovid2021$Semana)
+casoscovid2021$Ano <- factor(casoscovid2021$Ano)
+casoscovid2021$UCI <- factor(casoscovid2021$UCI)
+casoscovid2021$Hospitalizado <- factor(casoscovid2021$Hospitalizado)
+casoscovid2021$Defuncion<- factor(casoscovid2021$Defuncion)
+```
+
+## Edad de pacientes COVID 19
+
+Este el comportamiento de la edad de los pacientes que ingresan diagnósticados por semana epidemiológica
+
+```{r data2, echo=F, fig.width=9, fig.cap= "Edad de los paciente COVID 19."}
+
+casoscovid2021 %>%
+  group_by(Ano, Semana, UCI  ) %>%
+  ggplot(aes(y = Edad, x = Semana, group = Semana)) + 
+  geom_boxplot(aes(colour=Ano)) + 
+  facet_wrap(~Ano, nrow = 2) +
+  theme(legend.position = "bottom")
+```
+
+## Edad de los pacientes en UCI
+
+Aquí observamos el comportamiento de la edad en cada semana epidemiológica de los pacientes que ingresan a UCI
+
+```{r data3, echo=F, fig.width=9, fig.cap= "Pacientes en UCI por Covid según edad"}
+
+
+casoscovid2021 %>%
+  group_by(Ano, Semana) %>%
+  filter(UCI == "1") %>%
+  ggplot(aes(y = Edad, x = Semana, group = Semana)) + 
+  geom_boxplot(aes(colour=Ano)) + 
+  facet_wrap(~Ano, nrow = 2) +
+  theme(legend.position = "bottom")
+
+```
+
+## Edad de los pacientes hospitalizados
+
+```{r data4, echo=F, fig.width=9, fig.cap="Pacientes hospitalizados y edad."}
+
+casoscovid2021 %>%
+  group_by(Ano, Semana) %>%
+  filter(Hospitalizado == "1") %>%
+  ggplot(aes(y = Edad, x = Semana, group = Semana)) + 
+  geom_boxplot(aes(colour=Ano)) + 
+  facet_wrap(~Ano, nrow = 2) +
+  theme(legend.position = "bottom")
+
+```
+
