@@ -1,0 +1,479 @@
+---
+title: "Epidemiología de enfermedades infecciosas y transmisibles"
+author: "José W. Martínez, Manuel Andrés Martínez y Juan Camilo Martínez"
+date: "10/5/2021"
+output:
+  ioslides_presentation:
+    widescreen: true
+    smaller: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(deSolve)
+library(rootSolve)
+library(phaseR)
+library(shiny)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(plotly)
+library(ggplot2)
+library(kableExtra)
+```
+
+## Introducción
+
+En Europa durante el siglo XIV se notificaron alrededor de 25 millones de muertes en una población aproximada de 100 millones de personas a causa de la peste bubónica.
+
+Desde ese entonces se estudian las enfermedades transmisibles y ese estudio se facilita con la división de agentes en microparásitos y macroparásitos.
+
+Los microparásitos generalmente tienen una reproducción en altas tasas dentro de un huesped. Estos agentes se caracterizan por ser muy pequeños y sus generaciones son de poco tiempo.
+
+Los huespedes que se recuperan usualmente adquieren inmunidad entre los que se infectan por lo menos durante un tiempo y a veces toda la vida.
+
+
+
+
+## Clasificación de la población en relación al agente
+
+- Susceptibles
+- Infectados
+- Recuperados
+- Inmunes
+- Tasa básica de reproducción de casos: $R_{0}$
+- Si una persona infectada con una nueva cepa llega a una población de 100.000 habitantes todos son susceptibles.
+
+
+
+## Hechos relevantes
+
+La epidemiología de la infección, 
+
+. Período de incubación
+
+. Periodo de transmisión
+
+. Población de riesgo
+
+. Duración de la enfermedad
+
+. Duración de la inmunidad
+
+. Letalidad
+
+. Algunas características asociadas a mortalidad o supervivencia
+Modelo causal asociado al desenlace
+
+
+
+
+
+## Pasos en el desarrollo y uso de un modelo
+
+- Identifique la pregunta:
+  * *¿Cuál seria la proporción de individuos que se infectarían?*
+- Identifique hechos relevantes acerca de la infección en cuestion
+- Seleccione un método de modelado
+- Valide el modelo
+- Realice la predicción y optimización
+
+
+## Hechos relevantes
+
+
+- Describa los hechos clave de la situación epidemiológica
+- Defina el tiempo de exposición, período de latencia
+- Duración de la infección
+- Tiene definido básica de reproducción de casos
+- La infección afecta a que grupos sociales
+
+Un modelo puede dar información acerca del número de susceptibles, infectados e inmunes. 
+
+El modelo debe desarrollar ecuaciones de susceptibles infectados e inmunes ahora y después.
+
+
+## Historia natural de la infección
+
+```{r out.width = '55%', out.height='10%', fig.align = 'center' }
+
+knitr::include_graphics("historia2.png")
+
+```
+
+## Periodos de tiempo requeridos por los modelos
+
+- Estime el número de casos diarios.
+- Evalúe el tiempo de transmisión, así como los nacimientos, defunciones y migraciones.
+
+Recuerde que el número de susceptibles cambia sustancialmente y es posible que las defunciones y nacimientos así como las migraciones no sea relevante.
+
+También es posible que su modelo Suceptible, Expuesto, Infectado pueda despues tener  varios desenlaces como Tratado, Fallado, Curado.
+
+## Métodos de modelado 
+
+Modelos determinísticos:
+
+  - La entrada de los modelos son la tasa de la enfermedad, inicio de la enfermedad, identificación del tiempo de recuperación. El modelo predice el número de casos.
+  
+Modelos estocásticos:
+
+  - Estos modelos definen el número de sujetos entre compartimentos.
+  
+  
+## Modelos determinísticos compartimentales
+
+Estos modelos usan ecuaciones diferenciales. Estas ecuaciones se ocupan del estudio y solución de solución de ecuaciones que involucran derivadas.
+
+Una derivada es una diferencia infinetesimal. Las derivadas tienen un orden y se necesitan una función de tiempo. Estos sistemas de ecuaciones solo usan la primer derivada.
+
+Las derivadas representan razones de cambio de una variable con respecto a otra. 
+El siguiente ejemplo representa la razón de cambio de susceptibles en relación 
+a una diferencia de tiempos:
+
+\[\frac{dS}{dt}\]
+
+
+## Razones de cambio en el tiempo
+
+El número de susceptibles entre 2 tiempos como aparece a continuación:
+
+
+\[\frac{dS(t)}{dt}\]
+
+
+Las ecuaciones diferenciales describen las transiciones entre diferentes categorías usando medidas discretas de tiempo. 
+
+La clasificación de modelos tanto estocásticos como determinísticos pueden incorporar al modelo estocástico un componente determinístico, así como el modelo determinístico incorpora a veces componentes estocásticos los cuales pueden modular la transmisión o pueden establecer el rango de un desenlace.
+
+## Continuación razones de cambio
+
+Se pueden establecer modelos a través de simulaciones. Estos modelos pueden evidenciar procesos de infección en individuos de un colectivo. 
+
+Modelos de dinámica de la transmisión, estos modelos corresponden a la incorporación de contactos entre individuos. En estos modelos el riesgo o fuerza de la infección dependen del número de individuos infectados en la población y los cambios que sufren en el tiempo así como los cambios individuales.
+
+Redes, hace referencia a redes de contacto. También se pueden montar modelos SIR en una red.
+
+ 
+## Pronóstico según modelos de ecuaciones diferenciales
+
+Si asumimos que el presente está representado por un tiempo $t$, cualquier adición a este tiempo representará un momento en el futuro ($t+1$: "mañana" o "Próxima semana").
+
+* $S(t)$: Número de susceptibles "hoy".
+* $S(t+1)$: Npumero de susceptibles "mañana".
+* $S(t+1) - S(t)$: Diferencia en el número de susceptibles en dos tiempos.
+
+La probabilidad de infección $\lambda(t)$ representa el riesgo de infección en el tiempo $t$. 
+
+Si conoccemos el número de susceptibles $S(t)$ y el riesgo de infección $\lambda(t)$ podriamos calcular el número de infectados en un futuro de la siguiente manera  $\lambda(t)S(t+1)$.
+  
+
+
+## $\lambda(t)$: riesgo de infección
+
+$\lambda$ es una función que depende del tiempo.
+
+```{r echo = F, fig.width=4, fig.height=4, fig.align='center'}
+
+n = 1000
+
+set.seed(123)
+lambdas = sort(abs(rnorm(n, 0.35, 0.15)))
+dias = seq(0,90, length.out = n)
+
+Lambda_dt <- data.frame(cbind(lambdas, dias))
+
+Lambda_dt %>%
+  ggplot(aes(x = dias, y =lambdas)) + 
+  ylab(expression(lambda)) +
+  xlab('Tiempo') +
+  geom_point()
+```
+
+
+* **Nota:** Aqui asumimos que los parámetros que no tienen argumento son constantes.
+
+
+
+## Ecuaciones
+
+Si consideramos que $t$ indica un tiempo arbitrario, podemos calcular el numero (o proporcion) de susceptibles en el siguiente tiempo $t+1$:
+
+\[
+\underbrace{S(t+1)}_{Futuro} = \underbrace{S(t) - \lambda(t)S(t)}_{Presente}
+\]
+
+$\begin{matrix}
+Susceptible & \rightarrow & Expuestos & \rightarrow  & Infecci\acute{o}n  & \rightarrow & Recuperado \\ 
+ S(t) &  & E(t) &  & I(t)  &  & R(t)
+\end{matrix}$
+
+
+Las ecuaciones se pueden resumir de la siguiente manera:
+
+\[
+\frac{dS}{dt}= \mu (N −S)−\beta I\frac{S}{N}
+\]
+\[
+\frac{dI}{dt}= \beta I\frac{S}{N} - (\mu + \gamma) I
+\]
+
+
+
+## Ecuaciones
+
+$S(t+1) = S(t) - \lambda(t)S(t)$
+
+$E(t+1) = E(t) + \lambda(t)S(t) -\digamma E(t)$
+
+$I(t+1) = I(t) + \digamma E(t) - rI(t)$
+
+$R(t+1) = R(t) + rI(t)$
+
+$\lambda(t)$ corresponde al riesgo de un individuo susceptible para ser infectado en el tiempo $t$.
+
+$\digamma$ proporción de expuestos.
+
+$E(t)$ Expuestos en el tiempo $t$.
+
+$r$ proporción de infectados que son recuperados.
+
+
+Estas ecuaciones son los métodos para predecir susceptibles, expuestos, infectados y recuperados.
+
+## Conceptos e ideas clave
+
+La probabilidad  de que dos individuos entren en contacto es la misma. Este supuesto es similar al principio de *Accion de masas* que se usa en ciencias físicas. Los individuos entran en contacto de la misma manera como entran en contacto las moléculas de una gas. Este supuesto es definido como mezcla aleatoria y depende de la edad de un miembro de un grupo social.
+
+Aunque el supuesto de mezcla aleatoria se usa para obtener el números de susceptibles, infectados o recuperados debe ser ajustado en el tiempo. Un método para escribir este supuesto es es decir que el riesgo de infección  es proporcional al número de individuos infectados en el tiempo $t$.
+
+$\lambda(t) = \beta I(t)$
+
+$\beta$ es la tasa per capitat en que dos individuos específicos entran en contacto por unidad de tiempo o es la tasa que dos individuos específicos tienen un contacto efectivo por unidad de tiempo. $\beta$ entonces es la tasa de transmisión.
+
+Un contacto efectivo es un contacto que fue suficiente para la transmisión de alguien susceptible a la infección. El contacto efectivo también está en función del método de transmisión.
+
+## Conceptos e ideas clave
+
+El número de nuevas infecciones entre el tiempo $t$ y $t+1$ es dado por la expresión $\lambda(t) S(t)$. Sustituyendo a la expresión $\lambda(t) = \beta I(t)$ la expresión puede llevar a otra expresión sobre el total de nuevas infecciones en la población entre el tiempo $t$ y $t+1$.
+
+El total de nuevas infecciones en la población entre el el tiempo $t$ y 
+$t+1$ = $\beta I(t)S(t)$
+
+$\beta$ es un parámetro importante en el modelo de transmisión pero es dificil de estimar
+
+En el caso de una infección que inmunice 
+$\beta = \frac{R_{0}}{ND}$
+
+## Otros parámetros
+
+* $R_{0}$: Número básico de reproducción de casos.
+
+* $N$: tamaño de la población.
+
+* $D$: Duración de la infección.
+
+* $R_{0}$: representa el promedio de infecciones secundarias desde infectados que se introduce a la población susceptible en el tiempo $t=0$
+
+
+
+
+$\frac{dS}{dt}=\lambda(t) S(t)$  razón de cambio de susceptibles en el tiempo
+
+$\frac{dE}{dt}=\lambda(t) S(t) - \digamma E(t)$  
+
+$\frac{dI}{dt}=\digamma E(t) - rI(t)$
+
+$\frac{dR}{dt} = rI(t)$
+
+
+## Modelo SIR en R
+
+```{r echo=TRUE}
+sirmod = function(t, y, parms) {
+  # Condiciones iniciales se refieren al tiempo 0 y las proporciones iniciales de S, I, 
+  # y R: 
+  S = y[1]              # Proporción inicial de susceptibles
+  I = y[2]
+  R = y[3]
+  beta = parms["beta"]  # Número efectivo de contactos per captitat por unidad de tiempo
+  mu = parms["mu"]
+  gamma = parms["gamma"]
+  N = parms["N"]
+  dS = mu*(N - S) - beta*S*(I/N) 
+  dI = beta*S*(I/N) - (mu + gamma)*I
+  dR = gamma*I - mu*R
+  result = c(dS, dI, dR)
+  list(result)
+}
+times <- seq(0, 15, by = 1)
+parms = c(mu = 0, N = 1, beta = 1, gamma = 1/10)
+start = c(S = 0.825, I = 0.05, R = 0.17)
+
+out=ode(y=start, times=times, func=sirmod, parms=
+          parms)
+out=as.data.frame(out)
+```
+
+
+## Modelo SIR en R: Datos
+
+```{r}
+
+kbl(out, booktabs = T, caption = 'Resultados obtenidos:') %>%
+  kable_material(c('hover', 'striped'), full_width = F) %>%
+  scroll_box(width = '90%', height = '400px')
+
+```
+
+
+
+## Gráfico de la solución
+
+```{r echo=TRUE, fig.align='center'}
+plot(x=out$time, y=out$S, ylab="Fraction", xlab=
+       "Time", type="l", ylim = c(0,1.1))
+lines(x=out$time, y=out$I, col="red")
+lines(x=out$time, y=out$R, col="green")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Otra forma de ver la simulación
+
+```{r echo=TRUE, eval=FALSE}
+out %>% 
+  ggplot(aes(x=times, y=I)) +
+  geom_line(aes(colour="Infectados")) +
+  geom_line(aes(x=times, y=R, colour="Recuperados")) +
+  geom_line(aes(x=times, y=S, colour="Susceptibles")) +
+  xlab("Días") +
+  ylab("Fracción") +
+  scale_colour_manual(name="Convención", values= c("Infectados"="blue",
+                                                   "Recuperados"="red", 
+                                                   "Susceptibles" = "black")) +
+  theme(legend.position = 'bottom')
+```
+
+## Otra forma de ver la simulación
+
+```{r echo=FALSE, eval=TRUE, fig.align='center'}
+
+fig1 <- out %>% 
+  ggplot(aes(x=times, y=I)) +
+  geom_line(aes(colour="Infectados")) +
+  geom_line(aes(x=times, y=R, colour="Recuperados")) +
+  geom_line(aes(x=times, y=S, colour="Susceptibles")) +
+  xlab("Días") +
+  ylab("Fracción") +
+  scale_colour_manual(name="Convención", values= c("Infectados"="blue",
+                                                   "Recuperados"="red", 
+                                                   "Susceptibles" = "black")) +
+  theme(legend.position = 'bottom')
+
+ggplotly(fig1, tooltip = c('x', 'y'))
+
+```
+
+
+
+## Simulación para diferentes valores de $\beta$ (1)
+
+```{r warning=FALSE, message=FALSE, error=FALSE, echo=TRUE, eval=TRUE}
+times = seq(0, 15, by = 1)
+parms = c(mu = 0, N = 1, beta = 1, gamma = 1/10)
+start = c(S = 0.825, I = 0.05, R = 0.17)
+set.seed(1)
+betas = runif(10, 0, 3)
+
+Infectados = matrix(NA, nrow = length(times), ncol = length(betas))
+Susceptibles = matrix(NA, nrow = length(times), ncol = length(betas))
+Recuperados = matrix(NA, nrow = length(times), ncol = length(betas))
+
+for(i in 1:length(betas)){
+  parms = c(mu = 0, N = 1, beta = betas[i], gamma = 1/10)
+  out = ode(y = start, times = times, func = sirmod, parms = parms)
+  out = as.data.frame(out)
+  Infectados[, i] = out$I
+  Susceptibles[, i] = out$S
+  Recuperados[, i] = out$R
+}
+
+
+```
+
+## Simulación para diferentes valores de $\beta$ (2)
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE, echo=TRUE, eval=TRUE}
+
+Infectados = cbind(c(Infectados), c(rep(betas[1], length(times)), 
+                                    rep(betas[2], length(times)), 
+                                    rep(betas[3], length(times)),
+                                    rep(betas[4], length(times)), 
+                                    rep(betas[5], length(times)), 
+                                    rep(betas[6], length(times)),
+                                    rep(betas[7], length(times)), 
+                                    rep(betas[8], length(times)),
+                                    rep(betas[9], length(times)),
+                                    rep(betas[10], length(times))))
+
+SIR = data.frame(cbind(
+  'times' = rep(times, length(times)),
+  'Susceptibles' = c(Susceptibles),
+  'Recuperados' = c(Recuperados),
+  'Infectados' = Infectados
+))
+
+colnames(SIR)[4] = c("Infectados")
+colnames(SIR)[5] = c("Betas")
+
+```
+
+
+## Simulaciones para cada $\beta$ (3)
+
+```{r echo=TRUE, eval=FALSE}
+SIR %>%
+  ggplot(aes(x=times, y=Infectados, group=factor(Betas))) +
+  geom_line(aes(colour="Infectados")) +
+  geom_line(aes(x=times, y=Recuperados, colour="Recuperados")) +
+  geom_line(aes(x=times, y=Susceptibles, colour="Susceptibles")) +
+  xlab("Días") + ylim(0,1) +
+  ylab("Fracción") +
+  facet_wrap(~factor(round(Betas,2)), nrow = 2) +
+  scale_colour_manual(name="Convención", values= c("Infectados"="blue", 
+                                                   "Recuperados"="red", 
+                                                   "Susceptibles" = "black")) +
+  theme(legend.position = "bottom")
+```
+
+## Simulaciones para cada $\beta$ (4)
+
+```{r echo=FALSE, eval=TRUE, fig.align='center'}
+SIR %>%
+  ggplot(aes(x=times, y=Infectados, group=factor(Betas))) +
+  geom_line(aes(colour="Infectados")) +
+  geom_line(aes(x=times, y=Recuperados, colour="Recuperados")) +
+  geom_line(aes(x=times, y=Susceptibles, colour="Susceptibles")) +
+  xlab("Días") + ylim(0,1) +
+  ylab("Fracción") +
+  facet_wrap(~factor(round(Betas,2)), nrow = 2) +
+  scale_colour_manual(name="Convención", values= c("Infectados"="blue", 
+                                                   "Recuperados"="red", 
+                                                   "Susceptibles" = "black")) +
+  theme(legend.position = "bottom")
+```
+
