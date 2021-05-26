@@ -22,7 +22,9 @@ library(tidyverse)
 library(plotly)
 library(ggplot2)
 library(kableExtra)
-
+library(visNetwork)
+library(networkD3)
+library(htmlwidgets)
 
 ```
 
@@ -31,10 +33,10 @@ library(kableExtra)
 
 Estamos conectados a través de: 
 
-* instituciones
-* procesos
-* infraestructuras
-* Humanos
+* Instituciones.
+* Procesos.
+* Infraestructuras.
+* Humanos.
 
 ¿Qué es una red? ¿Cosas o personas que se conectan?
 
@@ -90,9 +92,9 @@ Si la distinción entre origen y destino es significativa, la red está dirigida
 
 *Intermediación* es la frecuencia con la que un nodo aparece con el camino más corto entre nodos de la red.
 
-*Cercanía* La distancia media desde un nodo inicial a todos los demás nodos de la red.
+*Cercanía* es la distancia media desde un nodo inicial a todos los demás nodos de la red.
 
-*Excentricidad* La distancia de un nodo al nodo más alejado de la red 
+*Excentricidad* la distancia de un nodo al nodo más alejado de la red. 
 
 *Densidad* mide cuan cerca está el grafo de ser completo. Un grafo completo tiene todas las aristas posibles y la densidad es de 1.
 
@@ -102,11 +104,11 @@ Si la distinción entre origen y destino es significativa, la red está dirigida
 
 *Hits* 
 Los valores separados para cada nodo. El primer valor es “Authority” 
-(cuan valiosa es la información de un nodo)
+(cuan valiosa es la información de un nodo).
 
 El segundo valor es *Hub* que mide la calidad de enlaces de ese nodo.
 
-*Modularidad* es un algoritmo de detención de comunidades
+*Modularidad* es un algoritmo de detención de comunidades.
 
 *Page rank* 
 clasifica los nodos de acuerdo a la frecuencia con la que un usuario siguiendo
@@ -120,15 +122,15 @@ enlaces llega a la página del nodo de forma aleatoria.
 Este coeficiente junto al valor promedio de camino mas corto puede indicar 
 un efecto de pequeño mundo. Indica como los nodos están incrustados entre 
 sus nodos vecinos. 
-El valor medio da una indicación general del cluster en la red
+El valor medio da una indicación general del cluster en la red.
 
-*Centralidad de vector propio* es la importancia de un nodo en la red basada en sus conexiones 
+*Centralidad de vector propio* es la importancia de un nodo en la red basada en sus conexiones.
 
 *Longitud media de camino* es una distancia es la distancia media de un grafo 
-entre todos los pares de nodos. Los nodos conectados tienen distancia 1, 
+entre todos los pares de nodos. Los nodos conectados tienen distancia 1.
 
 El *diámetro* es la distancia del grafo mas larga entre dos nodos cualquiera 
-de la red. Cuán lejos están los 2 nodos más alejados
+de la red. Cuán lejos están los 2 nodos más alejados.
 
 
 
@@ -146,20 +148,42 @@ en la red.
 
 ## y finalmente
 
-*Grado de salida* Determina las relaciones desde el caso hacia otros pacientes.
-Número de contactos que provoca cada nodo
+*Grado de salida* determina las relaciones desde el caso hacia otros pacientes.
+Número de contactos que provoca cada nodo.
 
-*Grado de entrada*: Determina el número de contactos que recibe un 
-caso o paciente
+*Grado de entrada*: determina el número de contactos que recibe un 
+caso o paciente.
 
 *Cercanía armónica*: Determina la importancia de un nodo dentro de la red. 
 Velocidad en la que la enfermedad puede ser propagada desde un caso. 
 
 
 
+## Tipos de redes
+
+Anillo:
+
+```{r}
+plot(create_ring(10))
+
+```
+
+
+## Tipos de redes
+
+Grafo completo:
+
+```{r}
+plot(create_complete(10))
+
+```
+
+
+
+
 ## Un nodo list
 
-Correspone a una lista de nodos. En su forma más simple, una lista de nodos es un dataframe con una sola columna, que etiquetaré como "id", que enumera los ID de nodo que se encuentran en la lista de relaciones. La ventaja de crear una lista de nodos separada es la capacidad de agregar columnas de atributos al marco de datos, como los nombres de los nodos o cualquier tipo de agrupación. A continuación, doy un ejemplo de listas mínimas de bordes y nodos creadas con la función `tibble()`.
+Corresponde a una lista de nodos. En su forma más simple, una lista de nodos es un dataframe con una sola columna, que etiquetaré como "id", que enumera los ID de nodo que se encuentran en la lista de relaciones. La ventaja de crear una lista de nodos separada es la capacidad de agregar columnas de atributos al marco de datos, como los nombres de los nodos o cualquier tipo de agrupación. A continuación, doy un ejemplo de listas mínimas de bordes y nodos creadas con la función `tibble()`.
 
 
 ## Cartas
@@ -173,11 +197,11 @@ kbl(head(letters), booktabs=T) %>%
 
 ```
 
-## Node list
+## Lista de nodos
 
-El worflow crea un node list que es similar en este caso al listado de ciudades; pero se quiere diferenciar la ciudad de envio de la ciudad de llegada y que la información este en esas columnas. 
+El método crea una lista de nodos que es similar en este caso al listado de ciudades; pero se quiere diferenciar la ciudad de envio de la ciudad de llegada y que la información este en esas columnas. 
 
-```{r echo=T,  warning=FALSE, message=FALSE, error=FALSE, echo=TRUE, eval=TRUE}
+```{r echo=F,  warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
 
 sources <- letters %>%
   distinct(source) %>%
@@ -189,8 +213,38 @@ destinations <- letters %>%
 
 ```
 
+## Cartas continuación
 
+```{r echo=F,  warning=FALSE, message=FALSE, error=FALSE, eval=T}
+nodes <- full_join(sources, destinations, by = "label")
+nodes <- nodes %>% rowid_to_column("id")
+per_route <- letters %>%  
+  group_by(source, destination) %>%
+  summarise(weight = n()) %>% 
+  ungroup()
+edges <- per_route %>% 
+  left_join(nodes, by = c("source" = "label")) %>% 
+  rename(from = id)
+edges <- edges %>% 
+  left_join(nodes, by = c("destination" = "label")) %>% 
+  rename(to = id)
+edges <- select(edges, from, to, weight)
+routes_network <- network(edges, vertex.attr = nodes, matrix.type = "edgelist", ignore.eval = FALSE)
+routes_tidy <- tbl_graph(nodes = nodes, edges = edges, directed = TRUE)
+routes_igraph <- graph_from_data_frame(d = edges, vertices = nodes, directed = TRUE)
+routes_igraph_tidy <- as_tbl_graph(routes_igraph)
+routes_tidy <- routes_tidy %>% 
+  activate(edges) %>% 
+  arrange(desc(weight))
+ggraph(routes_tidy, layout = "graphopt") + 
+  geom_node_point() +
+  geom_edge_link(aes(width = weight), alpha = 0.8) + 
+  scale_edge_width(range = c(0.2, 2)) +
+  geom_node_text(aes(label = label), repel = TRUE) +
+  labs(edge_width = "Letters") +
+  theme_graph()
 
+```
 
 
 ## La base de datos conglomerados
@@ -204,17 +258,18 @@ Conglomerados<- as.matrix(Conglomerados)
 colnames(Conglomerados) = c(1:nrow(Conglomerados))
 rownames(Conglomerados) = c(1:nrow(Conglomerados))
 network <- graph_from_adjacency_matrix(Conglomerados)
+class(network)
 network2 <- as_tbl_graph(network)
 class(network2)
-class(network)
 
 ```
 
-## Vectores
+## Histograma de grados
 
-```{r}
+```{r echo=F, warning=FALSE, error=FALSE, message=FALSE}
 degree=degree(network)
-hist(degree[degree > 0], breaks = 100)
+hist(degree[degree > 0], breaks = 100, main="Histograma", 
+     ylab= "Frecuencia", xlab= "Grados")
 
 ```
 
@@ -226,23 +281,25 @@ hist(degree[degree > 0], breaks = 100)
 
 
 
-## Histograma Cercanía
+## Histograma de Cercanía
 
-```{r}
+```{r echo=F, warning=FALSE, error=FALSE, message=FALSE}
 
 Closeness <- closeness(network)
-hist(Closeness[Closeness >0], breaks =100)
+hist(Closeness[Closeness >0],  breaks = 100, main="Histograma", 
+     ylab= "Frecuencia", xlab= "Cercanía")
 
 ```
 
 
 
-## Histograma 
+## Histograma *Betweenness*
 
-```{r}
+```{r echo=F, warning=FALSE, error=FALSE, message=FALSE}
 
 Betweenness <- betweenness(network)
-hist(Betweenness[Betweenness >0], breaks=100)
+hist(Betweenness[Betweenness >0], breaks=100, main="Histograma", 
+     ylab= "Frecuencia", xlab= "Betweenness")
 
 ```
 
@@ -250,10 +307,11 @@ hist(Betweenness[Betweenness >0], breaks=100)
 
 ## Histograma Hub
 
-```{r}
+```{r echo=F, warning=FALSE, error=FALSE, message=FALSE}
 
 Hub <- hub.score(network)$vector
-hist(Hub[Hub >0], breaks=100)
+hist(Hub[Hub >0], breaks=100, main="Histograma", 
+     ylab= "Frecuencia", xlab= "Hub")
 
 ```
 
@@ -261,10 +319,11 @@ hist(Hub[Hub >0], breaks=100)
 
 ## Histograma Autoridad
 
-```{r}
+```{r echo=F, warning=FALSE, error=FALSE, message=FALSE}
 
 Authority <- authority.score(network)$vector
-hist(Authority[Authority >0], breaks=100)
+hist(Authority[Authority >0], breaks=100, main="Histograma", 
+     ylab= "Frecuencia", xlab= "Autoridad")
 
 ```
 
@@ -301,4 +360,4 @@ network2 %>%
 
 
 
-## Visualización de la red
+
